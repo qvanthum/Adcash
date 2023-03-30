@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-blacklist = ['10000000000', '10000000001', '10000000002']
+blacklist = ['10000000000', '10000000001', '10000000002', '10000000003']
 loans = []
 
 
