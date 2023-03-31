@@ -33,7 +33,11 @@ def applyForLoan():
     if tooManyApplications(id):
         return jsonify({'error': 'The borrower has too many loan applications within the past 24 hours.'}), 400
 
-    loan = {'borrower_name': name, 'borrower_id': id, 'amount': amount, 'term': term, 'date': datetime.now()}
+    monthlyInterest = 0.05;
+    monthlyRepaymentAmount = round(amount * monthlyInterest / (1- (1 / (1+monthlyInterest) ** term)), 2);
+    repaymentAmount = round(monthlyRepaymentAmount * term, 2);
+
+    loan = {'borrower_name': name, 'borrower_id': id, 'amount': amount, 'term': term, 'date': datetime.now(), 'monthly_interest': monthlyInterest, 'repayment_amount': repaymentAmount, 'montlhy_repayment_amount': monthlyRepaymentAmount}
     loans.append(loan)
     print(loans)
     return jsonify({'message': 'Loan application submitted successfully!'}), 200
