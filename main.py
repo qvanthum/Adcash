@@ -1,69 +1,46 @@
 from flask import Flask, request, jsonify
-from datetime import datetime, timedelta
-import configparser
-
-config = configparser.ConfigParser()
-config.add_section('blacklist')
-config.set('blacklist', 'blacklisted_ids', '11111111111;22222222222;33333333333')
-
-with open(r'config.ini', 'w') as configfile:
-    config.write(configfile)
-
-config.read('config.ini')
-section = config['blacklist']
-blacklist = section['blacklisted_ids'].split(';')
+from datetime import datetime
+import configuration_provider
+import person
 
 app = Flask(__name__)
 loans = []
 
 
-def isBlacklisted(id):
-    return id in blacklist
-
-
-def tooManyApplications(id):
-    now = datetime.now()
-    applications = 0
-    for loan in loans:
-        if loan['borrower_id'] == id and now - loan['date'] <= timedelta(days=1):
-            applications += 1
-    return applications >= 3
-
-
 @app.route('/loan', methods=['POST'])
-def applyForLoan():
+def apply():
     name = request.json.get('name')
-    id = request.json.get('id')
     amount = request.json.get('amount')
     term = request.json.get('term')
+    personal_id = request.json.get('personal_id')
 
-    if isBlacklisted(id):
-        return jsonify({'error': 'This ID is blacklisted.'}), 400
+    if person.Person.is_person_blacklisted(personal_id):
+        return jsonify({'error': 'This person is blacklisted.'}), 400
 
-    if tooManyApplications(id):
+    if person.Person.has_too_many_applications_in_last_24_hours(personal_id, loans):
         return jsonify({'error': 'The borrower has too many loan applications within the past 24 hours.'}), 400
 
-    monthlyInterest = 0.05;
-    monthlyRepaymentAmount = round(amount * monthlyInterest / (1 - (1 / (1 + monthlyInterest) ** term)), 2);
-    repaymentAmount = round(monthlyRepaymentAmount * term, 2);
+    monthly_interest = configuration_provider.ConfigurationProvider.get_monthly_interest_rate()
+    monthly_repayment_amount = person.Person.calculate_monthly_repayement_amount(amount, monthly_interest, term)
+    repayment_amount = round(monthly_repayment_amount * term, 2)
 
-    loan = {'borrower_name': name, 'borrower_id': id, 'amount': amount, 'term': term, 'date': datetime.now(),
-            'monthly_interest': monthlyInterest, 'repayment_amount': repaymentAmount,
-            'montlhy_repayment_amount': monthlyRepaymentAmount}
+    loan = {'name': name, 'personal_id': personal_id, 'amount': amount, 'term': term, 'date': datetime.now(),
+            'monthly_interest': monthly_interest, 'repayment_amount': repayment_amount,
+            'monthly_repayment_amount': monthly_repayment_amount}
     loans.append(loan)
-    print(loans)
     return jsonify({'message': 'Loan application submitted successfully!'}), 200
 
 
-@app.route('/loan/<id>', methods=['GET'])
-def getLoansById(id):
+@app.route('/loan', methods=['GET'])
+def get_loans_by_id():
+    personal_id = request.args.get('personal-id')
     borrower_loans = []
     for loan in loans:
-        if loan['borrower_id'] == id:
+        if loan['personal_id'] == personal_id:
             borrower_loans.append(loan)
 
     if len(borrower_loans) == 0:
-        return jsonify({'message': 'No loans were found for the given ID.'}), 404
+        return jsonify({'message': 'No loans were found.'}), 404
     return jsonify({'loans': borrower_loans}), 200
 
 
