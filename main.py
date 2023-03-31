@@ -1,9 +1,19 @@
 from flask import Flask, request, jsonify
 from datetime import datetime, timedelta
+import configparser
+
+config = configparser.ConfigParser()
+config.add_section('blacklist')
+config.set('blacklist', 'blacklisted_ids', '11111111111;22222222222;33333333333')
+
+with open(r'config.ini', 'w') as configfile:
+    config.write(configfile)
+
+config.read('config.ini')
+section = config['blacklist']
+blacklist = section['blacklisted_ids'].split(';')
 
 app = Flask(__name__)
-
-blacklist = ['10000000000', '10000000001', '10000000002', '10000000003']
 loans = []
 
 
@@ -34,10 +44,12 @@ def applyForLoan():
         return jsonify({'error': 'The borrower has too many loan applications within the past 24 hours.'}), 400
 
     monthlyInterest = 0.05;
-    monthlyRepaymentAmount = round(amount * monthlyInterest / (1- (1 / (1+monthlyInterest) ** term)), 2);
+    monthlyRepaymentAmount = round(amount * monthlyInterest / (1 - (1 / (1 + monthlyInterest) ** term)), 2);
     repaymentAmount = round(monthlyRepaymentAmount * term, 2);
 
-    loan = {'borrower_name': name, 'borrower_id': id, 'amount': amount, 'term': term, 'date': datetime.now(), 'monthly_interest': monthlyInterest, 'repayment_amount': repaymentAmount, 'montlhy_repayment_amount': monthlyRepaymentAmount}
+    loan = {'borrower_name': name, 'borrower_id': id, 'amount': amount, 'term': term, 'date': datetime.now(),
+            'monthly_interest': monthlyInterest, 'repayment_amount': repaymentAmount,
+            'montlhy_repayment_amount': monthlyRepaymentAmount}
     loans.append(loan)
     print(loans)
     return jsonify({'message': 'Loan application submitted successfully!'}), 200
